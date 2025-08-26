@@ -1,0 +1,9 @@
+# requirements.txt
+# Install these via pip install -r requirements.txt
+streamlit
+tensorflow
+keras
+opencv-python
+numpy
+pillow
+fpdf
