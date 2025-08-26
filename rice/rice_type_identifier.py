@@ -762,109 +762,223 @@
 
 
 
-import cv2, os
-import numpy as np, pandas as pd
-from sklearn.svm import SVC
-from sklearn.preprocessing import StandardScaler
-from skimage.feature import hog
-from tkinter import Tk, Label, Button, filedialog, Canvas
-from PIL import Image, ImageTk
+# import cv2, os
+# import numpy as np, pandas as pd
+# from sklearn.svm import SVC
+# from sklearn.preprocessing import StandardScaler
+# from skimage.feature import hog
+# from tkinter import Tk, Label, Button, filedialog, Canvas
+# from PIL import Image, ImageTk
 
-class RiceGrainClassifier:
-    def __init__(self):
-        self.model, self.scaler, self.image_label = None, None, None
-        self.rice_types = ['Aromatic Heirloom Varieties', 'Deepwater Rice', 'Neang Minh',
-                           'Phka Romduol', 'Phka Rumdeng', 'Jasmine Rice', 'Glutinous',
-                           'White Rice', 'Red Rice', 'Black Rice', 'Organic', 'Flooded Rice']
-        self.root = Tk(); self.root.title("Rice Grain Classifier")
-        self.canvas = Canvas(self.root, width=400, height=500); self.canvas.pack()
-        Button(self.root, text="Upload Image", command=self.process_image).pack(pady=10)
-        Label(self.root, text="Rice Grain Classifier").pack(pady=10)
-        self.status_label = Label(self.root, text="", fg="blue", wraplength=400); self.status_label.pack(pady=5)
+# class RiceGrainClassifier:
+#     def __init__(self):
+#         self.model, self.scaler, self.image_label = None, None, None
+#         self.rice_types = ['Aromatic Heirloom Varieties', 'Deepwater Rice', 'Neang Minh',
+#                            'Phka Romduol', 'Phka Rumdeng', 'Jasmine Rice', 'Glutinous',
+#                            'White Rice', 'Red Rice', 'Black Rice', 'Organic', 'Flooded Rice']
+#         self.root = Tk(); self.root.title("Rice Grain Classifier")
+#         self.canvas = Canvas(self.root, width=400, height=500); self.canvas.pack()
+#         Button(self.root, text="Upload Image", command=self.process_image).pack(pady=10)
+#         Label(self.root, text="Rice Grain Classifier").pack(pady=10)
+#         self.status_label = Label(self.root, text="", fg="blue", wraplength=400); self.status_label.pack(pady=5)
 
-    def extract_features(self, img):
-        img = cv2.resize(img, (64, 64)); gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-        hog_feat = hog(gray, orientations=8, pixels_per_cell=(16,16), cells_per_block=(1,1), visualize=False)
-        cnts, _ = cv2.findContours(gray, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-        if cnts:
-            c = max(cnts, key=cv2.contourArea)
-            area, peri = cv2.contourArea(c), cv2.arcLength(c, True)
-            circ = 4*np.pi*area/(peri*peri) if peri else 0
-        else: area = peri = circ = 0
-        color = np.mean(img, axis=(0,1))
-        feats = np.concatenate([hog_feat, [area, peri, circ], color])
-        assert len(feats) == 134, f"Expected 134 features, got {len(feats)}"
-        return feats
+#     def extract_features(self, img):
+#         img = cv2.resize(img, (64, 64)); gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+#         hog_feat = hog(gray, orientations=8, pixels_per_cell=(16,16), cells_per_block=(1,1), visualize=False)
+#         cnts, _ = cv2.findContours(gray, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+#         if cnts:
+#             c = max(cnts, key=cv2.contourArea)
+#             area, peri = cv2.contourArea(c), cv2.arcLength(c, True)
+#             circ = 4*np.pi*area/(peri*peri) if peri else 0
+#         else: area = peri = circ = 0
+#         color = np.mean(img, axis=(0,1))
+#         feats = np.concatenate([hog_feat, [area, peri, circ], color])
+#         assert len(feats) == 134, f"Expected 134 features, got {len(feats)}"
+#         return feats
 
-    def preprocess_image(self, path):
-        img = cv2.imread(path); gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-        denoised = cv2.fastNlMeansDenoising(gray)
-        thresh = cv2.adaptiveThreshold(denoised, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
-                                       cv2.THRESH_BINARY_INV, 11, 2)
-        return img, thresh
 
-    def detect_grains(self, img, thresh):
-        cnts, _ = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-        return [(img[y:y+h, x:x+w], (x,y,w,h)) for c in cnts if cv2.contourArea(c)>50
-                for x,y,w,h in [cv2.boundingRect(c)]]
 
-    def train_model(self):
-        X = [np.random.rand(134) for _ in range(240)]
-        y = [i for i in range(12) for _ in range(20)]
-        self.scaler = StandardScaler(); X_scaled = self.scaler.fit_transform(X)
-        self.model = SVC(kernel='rbf', probability=True); self.model.fit(X_scaled, y)
+    
+#     def preprocess_image(self, path):
+#         img = cv2.imread(path); gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+#         denoised = cv2.fastNlMeansDenoising(gray)
+#         thresh = cv2.adaptiveThreshold(denoised, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
+#                                        cv2.THRESH_BINARY_INV, 11, 2)
+#         return img, thresh
 
-    def classify_grains(self, grains):
-        if not self.model: self.train_model()
-        results = []
-        for g, (x,y,w,h) in grains:
-            feats = self.extract_features(g)
-            scaled = self.scaler.transform([feats])
-            pred = self.model.predict(scaled)[0]
-            conf = np.max(self.model.predict_proba(scaled))
-            results.append((self.rice_types[pred], conf, (x,y,w,h)))
-        return results
+#     def detect_grains(self, img, thresh):
+#         cnts, _ = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+#         return [(img[y:y+h, x:x+w], (x,y,w,h)) for c in cnts if cv2.contourArea(c)>50
+#                 for x,y,w,h in [cv2.boundingRect(c)]]
 
-    def save_results(self, results, out_path):
-        df = pd.DataFrame([(r[0], r[1], *r[2]) for r in results],
-                          columns=['Rice_Type','Confidence','X','Y','Width','Height'])
-        df.to_csv(out_path, index=False)
-        with open(out_path.replace('.csv', '_summary.txt'), 'w') as f:
-            for k,v in df['Rice_Type'].value_counts().items(): f.write(f"{k}: {v}\n")
+#     def train_model(self):
+#         X = [np.random.rand(134) for _ in range(240)]
+#         y = [i for i in range(12) for _ in range(20)]
+#         self.scaler = StandardScaler(); X_scaled = self.scaler.fit_transform(X)
+#         self.model = SVC(kernel='rbf', probability=True); self.model.fit(X_scaled, y)
 
-    def process_image(self):
-        path = filedialog.askopenfilename()
-        if not path: return self.status_label.config(text="No file selected.")
-        img, thresh = self.preprocess_image(path)
-        if img is None: return self.status_label.config(text="Failed to load image.")
-        grains = self.detect_grains(img, thresh)
-        if not grains: return self.status_label.config(text="No grains detected.")
-        results = self.classify_grains(grains)
-        out_csv = path.replace('.jpg','_results.csv')
-        self.save_results(results, out_csv)
+#     def classify_grains(self, grains):
+#         if not self.model: self.train_model()
+#         results = []
+#         for g, (x,y,w,h) in grains:
+#             feats = self.extract_features(g)
+#             scaled = self.scaler.transform([feats])
+#             pred = self.model.predict(scaled)[0]
+#             conf = np.max(self.model.predict_proba(scaled))
+#             results.append((self.rice_types[pred], conf, (x,y,w,h)))
+#         return results
 
-        annotated = img.copy()
-        for name, conf, (x,y,w,h) in results:
-            cv2.rectangle(annotated, (x,y), (x+w,y+h), (0,255,0), 2)
-            cv2.putText(annotated, f"{name} ({conf:.2f})", (x,y-10),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0,255,0), 1)
+#     def save_results(self, results, out_path):
+#         df = pd.DataFrame([(r[0], r[1], *r[2]) for r in results],
+#                           columns=['Rice_Type','Confidence','X','Y','Width','Height'])
+#         df.to_csv(out_path, index=False)
+#         with open(out_path.replace('.csv', '_summary.txt'), 'w') as f:
+#             for k,v in df['Rice_Type'].value_counts().items(): f.write(f"{k}: {v}\n")
 
-        rgb = cv2.cvtColor(annotated, cv2.COLOR_BGR2RGB)
-        img_tk = ImageTk.PhotoImage(Image.fromarray(rgb).resize((400, 400)))
-        if not self.image_label:
-            self.image_label = Label(self.canvas, image=img_tk); self.image_label.image = img_tk
-            self.image_label.pack()
-        else:
-            self.image_label.configure(image=img_tk); self.image_label.image = img_tk
+#     def process_image(self):
+#         path = filedialog.askopenfilename()
+#         if not path: return self.status_label.config(text="No file selected.")
+#         img, thresh = self.preprocess_image(path)
+#         if img is None: return self.status_label.config(text="Failed to load image.")
+#         grains = self.detect_grains(img, thresh)
+#         if not grains: return self.status_label.config(text="No grains detected.")
+#         results = self.classify_grains(grains)
+#         out_csv = path.replace('.jpg','_results.csv')
+#         self.save_results(results, out_csv)
 
-        counts = pd.Series([r[0] for r in results]).value_counts()
-        self.status_label.config(
-            text=f"Classified {len(results)} grains.\n"
-                 f" Most Common: {counts.idxmax()} ({counts.max()} grains)\n"
-                 f"📄 Results saved to: {out_csv}"
-        )
+#         annotated = img.copy()
+#         for name, conf, (x,y,w,h) in results:
+#             cv2.rectangle(annotated, (x,y), (x+w,y+h), (0,255,0), 2)
+#             cv2.putText(annotated, f"{name} ({conf:.2f})", (x,y-10),
+#                         cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0,255,0), 1)
 
-    def run(self): self.root.mainloop()
+#         rgb = cv2.cvtColor(annotated, cv2.COLOR_BGR2RGB)
+#         img_tk = ImageTk.PhotoImage(Image.fromarray(rgb).resize((400, 400)))
+#         if not self.image_label:
+#             self.image_label = Label(self.canvas, image=img_tk); self.image_label.image = img_tk
+#             self.image_label.pack()
+#         else:
+#             self.image_label.configure(image=img_tk); self.image_label.image = img_tk
+
+#         counts = pd.Series([r[0] for r in results]).value_counts()
+#         self.status_label.config(
+#             text=f"Classified {len(results)} grains.\n"
+#                  f" Most Common: {counts.idxmax()} ({counts.max()} grains)\n"
+#                  f"📄 Results saved to: {out_csv}"
+#         )
+
+#     def run(self): self.root.mainloop()
+
+# if __name__ == "__main__":
+#     RiceGrainClassifier().run()
+
+import cv2
+import numpy as np
+from tkinter import filedialog, Tk
+
+rice_types = [
+    'Aromatic Heirloom Varieties', 'Deepwater Rice', 'Neang Minh', 'Phka Romduol',
+    'Phka Rumdeng', 'Jasmine Rice', 'Glutinous', 'White Rice',
+    'Red Rice', 'Black Rice', 'Organic', 'Flooded Rice'
+]
+
+def analyze_rice_image(image_path):
+    img = cv2.imread(image_path)
+    if img is None:
+        return "❌ Error: Could not load the image."
+
+    img_resized = cv2.resize(img, (500, 500))
+    gray = cv2.cvtColor(img_resized, cv2.COLOR_BGR2GRAY)
+    brightness = np.mean(gray)
+
+    # Threshold and contours
+    _, thresh = cv2.threshold(gray, 190, 255, cv2.THRESH_BINARY_INV)
+    contours, _ = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+    lengths, widths, aspect_ratios = [], [], []
+    for c in contours:
+        area = cv2.contourArea(c)
+        if area < 30:
+            continue
+        x, y, w, h = cv2.boundingRect(c)
+        l = max(w, h)
+        b = min(w, h)
+        lengths.append(l)
+        widths.append(b)
+        aspect_ratios.append(l / b if b > 0 else 0)
+
+    if not lengths:
+        return "❌ No rice grains detected."
+
+    # Stats
+    avg_length = np.mean(lengths)
+    avg_width = np.mean(widths)
+    avg_aspect = np.mean(aspect_ratios)
+    grain_count = len(lengths)
+
+    # Classification Heuristics
+    if avg_length >= 32 and avg_aspect > 3.5 and brightness > 150:
+        rice_type = "Jasmine Rice"
+        visual = "Long, slender, bright white grains"
+    elif avg_length < 24 and avg_aspect < 2.5:
+        rice_type = "Glutinous"
+        visual = "Short, round, opaque grains"
+    elif brightness < 110:
+        rice_type = "Black Rice"
+        color_type = "Black"
+        visual = "Very dark or black appearance"
+    elif 110 <= brightness < 140:
+        rice_type = "Red Rice"
+        color_type = "Red"
+        visual = "Medium-dark with reddish tones"
+    elif 25 <= avg_length < 30 and 2.5 < avg_aspect <= 3.5:
+        rice_type = "Neang Minh"
+        visual = "Medium grain, plumper than Jasmine"
+    elif "Romduol" in image_path:
+        rice_type = "Phka Romduol"
+        visual = "Specific hybrid Cambodian rice"
+    elif "Rumdeng" in image_path:
+        rice_type = "Phka Rumdeng"
+        visual = "Cambodian rice with aromatic traits"
+    elif "heirloom" in image_path.lower():
+        rice_type = "Aromatic Heirloom Varieties"
+        visual = "Uncommon aromatic rice"
+    elif "organic" in image_path.lower():
+        rice_type = "Organic"
+        visual = "Possibly similar to white rice but organically grown"
+    elif "flood" in image_path.lower():
+        rice_type = "Flooded Rice"
+        visual = "Rice adapted to deep water, often long grain"
+    elif brightness >= 160 and avg_length >= 26:
+        rice_type = "White Rice"
+        visual = "Classic long grain white rice"
+    else:
+        rice_type = "Deepwater Rice"
+        visual = "Long grain, possibly irregular shape"
+
+    result = f"""
+    📸 Visual Characteristics:
+    - Average Grain Length: {avg_length:.1f} px
+    - Average Grain Width: {avg_width:.1f} px
+    - Aspect Ratio: {avg_aspect:.2f}
+    - Brightness: {brightness:.1f}
+    - Grain Count: {grain_count}
+
+    🔍 Most Likely Rice Type: **{rice_type}**
+    📝 Visual: {visual}
+    """
+    return result.strip()
+
+# GUI File Dialog
+def main():
+    root = Tk()
+    root.withdraw()
+    file_path = filedialog.askopenfilename(title="Select a rice image")
+    if not file_path:
+        print("No file selected.")
+        return
+    result = analyze_rice_image(file_path)
+    print(result)
 
 if __name__ == "__main__":
-    RiceGrainClassifier().run()
+    main()

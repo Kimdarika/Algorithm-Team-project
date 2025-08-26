@@ -6,7 +6,8 @@ import os
 import cv2
 import numpy as np
 import tensorflow as tf
-from teras.preprocessing.image import img_to_array
+from tensorflow.keras.preprocessing.image import img_to_array
+
 
 from PIL import Image
 import hashlib
